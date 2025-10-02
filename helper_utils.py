@@ -1,4 +1,3 @@
-# train_and_eval.py
 import numpy as np
 import gymnasium as gym
 from env import GridEnv
