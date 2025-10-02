@@ -6,17 +6,22 @@ import gymnasium as gym
 class GridEnv(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=5, max_steps=100, num_obstacles=3):
-        self.size = size
+    def __init__(self, render_mode=None, grid_size=(5, 5), max_steps=100, num_obstacles=3):
+        # grid_size is now a tuple (rows, columns) or (height, width)
+        self.grid_size = np.array(grid_size)
+        self.rows = self.grid_size[0]
+        self.cols = self.grid_size[1]
         self.max_steps = max_steps
         self.step_count = 0
         self.num_obstacles = num_obstacles
-        
+        self._should_render = False  
+
+
         # Observation: agent, target, obstacles
         self.observation_space = gym.spaces.Dict({
-            "agent": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-            "target": gym.spaces.Box(0, size - 1, shape=(2,), dtype=int),
-            "obstacles": gym.spaces.Box(0, size - 1, shape=(self.num_obstacles, 2), dtype=int)
+            "agent": gym.spaces.Box(0, max(self.grid_size) - 1, shape=(2,), dtype=int),
+            "target": gym.spaces.Box(0, max(self.grid_size) - 1, shape=(2,), dtype=int),
+            "obstacles": gym.spaces.Box(0, max(self.grid_size) - 1, shape=(self.num_obstacles, 2), dtype=int)
         })
         
         # Action: 4 directions
@@ -51,32 +56,46 @@ class GridEnv(gym.Env):
         super().reset(seed=seed)
         self.step_count = 0
 
-        # Random agent and target
-        self._agent_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+        # Random agent
+        self._agent_location = self.np_random.integers(0, self.grid_size, size=2, dtype=int)
+        
+        # Random target (different from agent)
         self._target_location = self._agent_location
         while np.array_equal(self._target_location, self._agent_location):
-            self._target_location = self.np_random.integers(0, self.size, size=2, dtype=int)
+            self._target_location = self.np_random.integers(0, self.grid_size, size=2, dtype=int)
 
         # Random obstacles (no overlap with agent or target)
         self._obstacles = []
         while len(self._obstacles) < self.num_obstacles:
-            pos = self.np_random.integers(0, self.size, size=2, dtype=int)
+            pos = self.np_random.integers(0, self.grid_size, size=2, dtype=int)
             if (not np.array_equal(pos, self._agent_location) and 
                 not np.array_equal(pos, self._target_location) and
                 not any(np.array_equal(pos, o) for o in self._obstacles)):
                 self._obstacles.append(pos)
         self._obstacles = np.array(self._obstacles, dtype=int)
 
-        if self.render_mode == "human":
+        if self._should_render:
             self.render_frame()
+
         return self._get_obs(), self._get_info()
+
+
+    def _is_out_of_bounds(self, position):
+        """Check if position is out of grid bounds"""
+        return (position[0] < 0 or position[0] >= self.cols or 
+                position[1] < 0 or position[1] >= self.rows)
+
 
     def step(self, action):
         self.step_count += 1
         action = int(action)
         direction = self._action_to_direction[action]
 
-        new_pos = np.clip(self._agent_location + direction, 0, self.size - 1)
+        new_pos = np.clip(self._agent_location + direction, [0, 0], self.grid_size - 1)
+
+        if self._is_out_of_bounds(new_pos):
+            reward = -1
+            terminated = True  # Episode ends immediately when stepping out of bounds
 
         # Check collision with obstacles
         if any(np.array_equal(new_pos, o) for o in self._obstacles):
@@ -88,30 +107,35 @@ class GridEnv(gym.Env):
             if terminated: 
                 reward = 1.0 
             else: 
-                old_dist = np.linalg.norm(self._agent_location - self._target_location, ord = 1)
+                old_dist = np.linalg.norm(self._agent_location - self._target_location, ord=1)
                 new_dist = np.linalg.norm(new_pos - self._target_location, ord=1)
                 if new_dist < old_dist: 
                     reward = 0.01 
                 else: 
                     reward = -0.05
 
-
         truncated = self.step_count >= self.max_steps
-
-        if self.render_mode == "human":
-            self.render_frame()
-
+        
         return self._get_obs(), reward, terminated, truncated, self._get_info()
+
+    def enable_rendering(self):
+        """Enable rendering for this environment instance"""
+        self._should_render = True
+
+    def disable_rendering(self):
+        """Disable rendering for this environment instance"""
+        self._should_render = False
+
 
     def render_frame(self):
         print("\n" + "=" * 50) 
-        print(f"Grid World (size: {self.size}x{self.size}) | Step: {self.step_count}/{self.max_steps}")
+        print(f"Grid World (size: {self.rows}x{self.cols}) | Step: {self.step_count}/{self.max_steps}")
         print("A = Agent, T = Target, X = Obstacle")
         print()
         
-        for y in range(self.size - 1, -1, -1):
+        for y in range(self.rows - 1, -1, -1):
             row = "|"
-            for x in range(self.size):
+            for x in range(self.cols):
                 pos = np.array([x, y])
                 if np.array_equal(pos, self._agent_location):
                     row += " A |"
