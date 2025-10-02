@@ -3,17 +3,14 @@ import numpy as np
 import gymnasium as gym
 from env import GridEnv
 
-
-
 class DictToArrayWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.size = env.size 
         # Flatten observation: agent(2) + target(2) + obstacles(num_obstacles*2)
         obs_size = 2 + 2 + env.num_obstacles * 2
         self.observation_space = gym.spaces.Box(
             low=0,
-            high=env.size - 1,
+            high=max(env.grid_size) - 1,  # Use max dimension for upper bound
             shape=(obs_size,),
             dtype=int
         )
@@ -26,15 +23,16 @@ class DictToArrayWrapper(gym.ObservationWrapper):
             observation["obstacles"].flatten()
         ])
 
-        
+
+
 def make_env(grid_size, num_obstacles, max_steps):
-    env = GridEnv(size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles)
+    env = GridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles)
     env = DictToArrayWrapper(env)  # Convert dict to array
     return env
 
 
-def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=10):
-    """Test the trained model - FIXED VERSION"""
+def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=10, render=True):
+    """Test the trained model"""
     print(f"\nTesting trained model for {num_episodes} episodes...")
     
     successes = 0
@@ -42,7 +40,7 @@ def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=
     
     for episode in range(num_episodes):
         # Create a fresh environment for this episode
-        original_env = GridEnv(size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles, render_mode="ansi")
+        original_env = GridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles, render_mode="human")
         wrapped_env = DictToArrayWrapper(original_env)
         
         # Reset the environment
@@ -50,9 +48,13 @@ def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=
         terminated = False
         truncated = False
         steps = 0
-        
+
+        if render:
+            original_env.enable_rendering()
+
         print(f"\n--- Episode {episode + 1} ---")
-        original_env.render_frame()  # Render from ORIGINAL environment
+        if render:
+            original_env.render_frame()# Render from ORIGINAL environment 
         
         while not (terminated or truncated):
             # Get action from model using the wrapped observation
@@ -64,7 +66,8 @@ def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=
             total_steps += 1
             
             # Render from ORIGINAL environment (not the wrapper)
-            original_env.render_frame()
+            if render: 
+                original_env.render_frame()
             
             if terminated:
                 # Check if termination was due to SUCCESS or COLLISION
