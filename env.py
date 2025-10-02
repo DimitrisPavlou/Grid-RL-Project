@@ -1,7 +1,7 @@
-# grid_env.py
-from __future__ import annotations
 import numpy as np
 import gymnasium as gym
+
+# the main environment of the project
 
 class GridEnv(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 4}
