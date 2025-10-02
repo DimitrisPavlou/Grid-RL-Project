@@ -1,7 +1,7 @@
-from __future__ import annotations
 import numpy as np
 import gymnasium as gym
 
+# a simpler environment for experimentation
 
 class SimpleGridWorldEnv(gym.Env):
     metadata = {"render_modes": ["human", "ansi"], "render_fps": 4}
