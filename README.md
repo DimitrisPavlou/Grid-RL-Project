@@ -1,7 +1,7 @@
 # Grid-RL-Project
 This is a reposotory for a Reinforcement Learning project with a focus on environment design, specifically a grid environment
 
-To setup the project, install the libraries with the required versions found in the requirements.txt file.
+To setup the project, install the packages with the required versions found in the requirements.txt file.
 
 To train an agent I used the stable-baselines3 library. I opted for a Proximal Policy Optimization (PPO) agent and DQN agent. The train.py script has the agents already set up with their respective hyperparameters that were found beneficial for the convergence of the agents 
 
