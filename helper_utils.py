@@ -1,6 +1,9 @@
+# train_and_eval.py
 import numpy as np
 import gymnasium as gym
 from env import GridEnv
+from expanded_env import ExpandedGridEnv
+
 
 class DictToArrayWrapper(gym.ObservationWrapper):
     def __init__(self, env):
@@ -23,14 +26,42 @@ class DictToArrayWrapper(gym.ObservationWrapper):
         ])
 
 
+class ExpandedDictToArrayWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # Flatten observation: agent(2) + target(2) + obstacles(num_obstacles*2) + bonus_positions(num_bonus*2) + bonus_collected(num_bonus)
+        obs_size = 2 + 2 + env.num_obstacles * 2 + env.num_bonus * 2 + env.num_bonus
+        self.observation_space = gym.spaces.Box(
+            low=0,
+            high=max(env.grid_size) - 1,  # Use max dimension for upper bound
+            shape=(obs_size,),
+            dtype=int
+        )
 
-def make_env(grid_size, num_obstacles, max_steps):
+    def observation(self, observation):
+        # Flatten everything into 1D
+        return np.concatenate([
+            observation["agent"],
+            observation["target"],
+            observation["obstacles"].flatten(),
+            observation["bonus_positions"].flatten(),
+            observation["bonus_collected"].astype(int)  # Convert boolean to int (0 or 1)
+        ])
+
+
+
+def make_env(grid_size, num_obstacles, max_steps): 
     env = GridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles)
-    env = DictToArrayWrapper(env)  # Convert dict to array
+    env = DictToArrayWrapper(env)
+    return env
+
+def make_expanded_env(grid_size, num_obstacles, max_steps, num_bonus=2):
+    env = ExpandedGridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles, num_bonus=num_bonus)
+    env = ExpandedDictToArrayWrapper(env)  # Convert dict to array
     return env
 
 
-def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=10, render=False, print_every = 10):
+def test_trained_model(model, grid_size, num_obstacles, max_steps, expanded = False, num_bonus=0, num_episodes=10, render=False, print_every = 10):
     """Test the trained model"""
     print(f"\nTesting trained model for {num_episodes} episodes...")
     
@@ -39,9 +70,14 @@ def test_trained_model(model, grid_size, num_obstacles, max_steps, num_episodes=
     mean_rewards = []
     for episode in range(1, num_episodes+1):
         # Create a fresh environment for this episode
-        original_env = GridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles, render_mode="human")
-        wrapped_env = DictToArrayWrapper(original_env)
+        if expanded: 
+            original_env = ExpandedGridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles, num_bonus=num_bonus, render_mode="human")
+            wrapped_env = ExpandedDictToArrayWrapper(original_env)
+        else: 
+            original_env = GridEnv(grid_size=grid_size, max_steps=max_steps, num_obstacles=num_obstacles, render_mode="human")
+            wrapped_env = DictToArrayWrapper(original_env)
         
+
         # Reset the environment
         obs, _ = wrapped_env.reset()
         terminated = False
