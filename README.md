@@ -1,5 +1,5 @@
 # Grid-RL-Project
-This is a reposotory for a Reinforcement Learning project with a focus on environment design, specifically a grid environment
+This is a repository for a Reinforcement Learning project with a focus on environment design, specifically a grid environment
 
 To setup the project, install the packages with the required versions found in the requirements.txt file.
 
